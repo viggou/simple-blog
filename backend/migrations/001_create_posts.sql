@@ -1,5 +1,5 @@
 -- up
-CREATE TABLE posts (
+CREATE TABLE IF NOT EXISTS posts (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
@@ -10,9 +10,9 @@ CREATE TABLE posts (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_posts_slug ON posts (slug);
-CREATE INDEX idx_posts_published ON posts (published);
-CREATE INDEX idx_posts_created_at ON posts (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_slug ON posts (slug);
+CREATE INDEX IF NOT EXISTS idx_posts_published ON posts (published);
+CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts (created_at DESC);
 
 -- down
-DROP TABLE posts;
+DROP TABLE IF EXISTS posts;
