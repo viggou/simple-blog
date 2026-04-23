@@ -7,9 +7,8 @@ RUN apt-get update && apt-get install -y \
 RUN git clone --recursive https://github.com/praia-lang/praia.git /tmp/praia \
     && cd /tmp/praia && make && make install PREFIX=/usr
 
-# Install grains in builder (has git + latest sand)
 WORKDIR /grains
-COPY sand-lock.yaml grain.yaml ./
+COPY sand-lock.yaml ./
 RUN sand install
 
 FROM ubuntu:24.04
