@@ -47,7 +47,7 @@ func parseSections(content) {
 }
 
 func listFiles(dir) {
-    return sys.readDir(dir)
+    return sys.exec("ls " + dir).stdout.strip().split("\n")
         |> filter(lam{ f in f.endsWith(".sql") })
         |> sort
 }
