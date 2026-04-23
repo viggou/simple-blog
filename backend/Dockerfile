@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
 RUN git clone --recursive https://github.com/praia-lang/praia.git /tmp/praia \
     && cd /tmp/praia && make && make install PREFIX=/usr
 
-WORKDIR /grains
+WORKDIR /app
 COPY sand-lock.yaml ./
 RUN sand install
 
@@ -22,7 +22,7 @@ COPY --from=builder /usr/lib/praia/ /usr/lib/praia/
 
 WORKDIR /app
 COPY . .
-COPY --from=builder /grains/ext_grains/ ./ext_grains/
+COPY --from=builder /app/ext_grains/ ./ext_grains/
 
 EXPOSE 3000
 
