@@ -1,0 +1,5 @@
+func slugify(title) {
+    return title.lower().replacePattern("[^a-z0-9]+", "-").replacePattern("^-|-$", "")
+}
+
+export { slugify }

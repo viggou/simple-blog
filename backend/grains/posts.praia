@@ -1,0 +1,118 @@
+use "./utils"
+
+func list(pg, showAll) {
+    if (showAll) {
+        return pg.query("SELECT * FROM posts ORDER BY created_at DESC")
+    }
+    return pg.query("SELECT * FROM posts WHERE published = TRUE ORDER BY created_at DESC")
+}
+
+func getBySlug(pg, slug) {
+    let rows = pg.query("SELECT * FROM posts WHERE slug = ?", [slug])
+    if (len(rows) == 0) {
+        return nil
+    }
+    return rows[0]
+}
+
+func getById(pg, id) {
+    let rows = pg.query("SELECT * FROM posts WHERE id = ?", [id])
+    if (len(rows) == 0) {
+        return nil
+    }
+    return rows[0]
+}
+
+func create(pg, data) {
+    let slug = utils.slugify(data.title)
+
+    // check for slug collision, append -2, -3, etc. if needed
+    let existing = pg.query("SELECT id FROM posts WHERE slug = ?", [slug])
+    if (len(existing) > 0) {
+        let n = 2
+        while (true) {
+            let candidate = slug + "-" + str(n)
+            let check = pg.query("SELECT id FROM posts WHERE slug = ?", [candidate])
+            if (len(check) == 0) {
+                slug = candidate
+                break
+            }
+            n = n + 1
+        }
+    }
+
+    let published = false
+    if (data.published) {
+        published = data.published
+    }
+
+    let excerpt = ""
+    if (data.excerpt) {
+        excerpt = data.excerpt
+    }
+
+    let content = ""
+    if (data.content) {
+        content = data.content
+    }
+
+    let rows = pg.query(
+        "INSERT INTO posts (title, slug, content, excerpt, published) VALUES (?, ?, ?, ?, ?) RETURNING *",
+        [data.title, slug, content, excerpt, published]
+    )
+    return rows[0]
+}
+
+func update(pg, id, data) {
+    let existing = getById(pg, id)
+    if (!existing) {
+        return nil
+    }
+
+    let title = existing.title
+    if (data.title) { title = data.title }
+
+    let content = existing.content
+    if (keys(data).contains("content")) { content = data.content }
+
+    let excerpt = existing.excerpt
+    if (keys(data).contains("excerpt")) { excerpt = data.excerpt }
+
+    let published = existing.published
+    if (keys(data).contains("published")) { published = data.published }
+
+    let slug = existing.slug
+    if (data.title && data.title != existing.title) {
+        slug = utils.slugify(data.title)
+        // check collision
+        let check = pg.query("SELECT id FROM posts WHERE slug = ? AND id != ?", [slug, id])
+        if (len(check) > 0) {
+            let n = 2
+            while (true) {
+                let candidate = slug + "-" + str(n)
+                let c = pg.query("SELECT id FROM posts WHERE slug = ? AND id != ?", [candidate, id])
+                if (len(c) == 0) {
+                    slug = candidate
+                    break
+                }
+                n = n + 1
+            }
+        }
+    }
+
+    let rows = pg.query(
+        "UPDATE posts SET title = ?, slug = ?, content = ?, excerpt = ?, published = ?, updated_at = NOW() WHERE id = ? RETURNING *",
+        [title, slug, content, excerpt, published, id]
+    )
+    if (len(rows) == 0) {
+        return nil
+    }
+    return rows[0]
+}
+
+func remove(pg, id) {
+    let result = pg.run("DELETE FROM posts WHERE id = ?", [id])
+    return result.changes > 0
+}
+
+export { list, getBySlug, getById, create, update, remove }

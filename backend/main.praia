@@ -1,0 +1,118 @@
+use "dotenv"
+use "db"
+use "router"
+use "middleware"
+use "logger"
+use "./grains/migrate"
+use "./grains/posts"
+
+
+dotenv.load()
+
+let log = logger.create("Blog")
+
+let pg = db.postgres({
+    host: sys.env("DB_HOST"),
+    port: num(sys.env("DB_PORT")),
+    user: sys.env("DB_USER"),
+    password: sys.env("DB_PASSWORD"),
+    database: sys.env("DB_NAME")
+})
+
+log.info("Connected to PostgreSQL")
+log.info("Running migrations...")
+migrate.up(pg, "./migrations", log)
+
+let app = router.create()
+
+// middleware
+app.use(middleware.cors())
+app.use(middleware.jsonBody())
+app.use(logger.middleware(log))
+
+// routes
+
+@app.get("/api/posts")
+func listPosts(req, params) {
+    let showAll = false
+    if (keys(req.query).contains("all") && req.query.all == "true") {
+        showAll = true
+    }
+    return http.json(posts.list(pg, showAll))
+}
+
+@app.get("/api/posts/:slug")
+func getPost(req, params) {
+    let post = posts.getBySlug(pg, params.slug)
+    if (!post) {
+        return http.json({error: "Post not found"}, 404)
+    }
+    return http.json(post)
+}
+
+@app.post("/api/posts")
+func createPost(req, params) {
+    if (!req.json || !req.json.title) {
+        return http.json({error: "Title is required"}, 400)
+    }
+    try {
+        let post = posts.create(pg, req.json)
+        return http.json(post, 201)
+    } catch (err) {
+        log.error("Failed to create post: %{err}")
+        return http.json({error: str(err)}, 500)
+    }
+}
+
+@app.put("/api/posts/:id")
+func updatePost(req, params) {
+    if (!req.json) {
+        return http.json({error: "Request body required"}, 400)
+    }
+    try {
+        let post = posts.update(pg, num(params.id), req.json)
+        if (!post) {
+            return http.json({error: "Post not found"}, 404)
+        }
+        return http.json(post)
+    } catch (err) {
+        log.error("Failed to update post %{params.id}: %{err}")
+        return http.json({error: str(err)}, 500)
+    }
+}
+
+@app.delete("/api/posts/:id")
+func deletePost(req, params) {
+    try {
+        let deleted = posts.remove(pg, num(params.id))
+        if (!deleted) {
+            return http.json({error: "Post not found"}, 404)
+        }
+        return http.json({ok: true})
+    } catch (err) {
+        log.error("Failed to delete post %{params.id}: %{err}")
+        return http.json({error: str(err)}, 500)
+    }
+}
+
+// static serving
+
+@app.get("/assets/:file")
+func serveAsset(req, params) {
+    return http.file("../frontend/dist/assets/" + params.file)
+}
+
+app.notFound(lam{ req, params in
+    if (req.path.startsWith("/api")) {
+        return http.json({error: "Not found"}, 404)
+    }
+    return http.file("../frontend/dist/index.html")
+})
+
+let port = num(sys.env("PORT"))
+log.info("Blog API running on http://localhost:%{port}")
+app.listen(port)
+
+// ctrl-c or docker stop
+pg.close()
+log.info("Shutdown complete")

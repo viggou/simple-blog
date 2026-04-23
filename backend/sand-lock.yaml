@@ -1,0 +1,11 @@
+grains:
+  dotenv:
+    source: github.com/viggou/praia-dotenv
+    version: latest
+    url: https://github.com/viggou/praia-dotenv.git
+    installed: 2026-04-23
+  db:
+    source: github.com/viggou/praia-db
+    version: latest
+    url: https://github.com/viggou/praia-db.git
+    installed: 2026-04-23

@@ -1,0 +1,117 @@
+// Database migration runner
+//
+// Usage:
+//   use "./grains/migrate"
+//   migrate.up(pg, "./migrations", log)    // apply all pending
+//   migrate.down(pg, "./migrations", log)  // rollback last migration
+//   migrate.status(pg, "./migrations", log) // show applied/pending
+
+func out(log, msg) {
+    if (log) { log.info(msg) }
+    else { print(msg) }
+}
+
+func ensureTable(pg) {
+    pg.run("CREATE TABLE IF NOT EXISTS _migrations (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        applied_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )")
+}
+
+func applied(pg) {
+    return pg.query("SELECT name FROM _migrations ORDER BY id")
+        |> map(lam{ row in row.name })
+}
+
+func parseSections(content) {
+    let upSql = ""
+    let downSql = ""
+    let section = ""
+
+    let lines = content.split("\n")
+    for (line in lines) {
+        let trimmed = line.strip()
+        if (trimmed == "-- up") {
+            section = "up"
+        } elif (trimmed == "-- down") {
+            section = "down"
+        } elif (section == "up") {
+            upSql = upSql + line + "\n"
+        } elif (section == "down") {
+            downSql = downSql + line + "\n"
+        }
+    }
+
+    return {up: upSql.strip(), down: downSql.strip()}
+}
+
+func listFiles(dir) {
+    return sys.readDir(dir)
+        |> filter(lam{ f in f.endsWith(".sql") })
+        |> sort
+}
+
+func up(pg, dir, log) {
+    ensureTable(pg)
+    let files = listFiles(dir)
+    let done = applied(pg)
+    let ran = 0
+
+    for (file in files) {
+        if (!done.contains(file)) {
+            let content = sys.read(dir + "/" + file)
+            let sections = parseSections(content)
+            if (len(sections.up) == 0) {
+                throw "Migration %{file} has no -- up section"
+            }
+            out(log, "Applying %{file}...")
+            pg.run(sections.up)
+            pg.run("INSERT INTO _migrations (name) VALUES (?)", [file])
+            ran = ran + 1
+        }
+    }
+
+    if (ran == 0) {
+        out(log, "No pending migrations")
+    } else {
+        out(log, "Applied %{ran} migration(s)")
+    }
+}
+
+func down(pg, dir, log) {
+    ensureTable(pg)
+    let done = applied(pg)
+    if (len(done) == 0) {
+        out(log, "Nothing to rollback")
+        return
+    }
+
+    let last = done[len(done) - 1]
+    let content = sys.read(dir + "/" + last)
+    let sections = parseSections(content)
+    if (len(sections.down) == 0) {
+        throw "Migration %{last} has no -- down section"
+    }
+
+    out(log, "Rolling back %{last}...")
+    pg.run(sections.down)
+    pg.run("DELETE FROM _migrations WHERE name = ?", [last])
+    out(log, "Rollback complete")
+}
+
+func status(pg, dir, log) {
+    ensureTable(pg)
+    let files = listFiles(dir)
+    let done = applied(pg)
+
+    for (file in files) {
+        if (done.contains(file)) {
+            out(log, "[x] %{file}")
+        } else {
+            out(log, "[ ] %{file}")
+        }
+    }
+}
+
+export { up, down, status }
