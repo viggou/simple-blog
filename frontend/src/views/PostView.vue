@@ -10,7 +10,7 @@
         <h1>{{ post.title }}</h1>
         <div class="meta">{{ formatDate(post.created_at) }}</div>
       </div>
-      <MarkdownContent :content="post.content" />
+      <MarkdownContent :html="post.html" />
     </article>
   </div>
 </template>

@@ -26,7 +26,7 @@
 
         <div class="preview-pane">
           <h3>Preview</h3>
-          <MarkdownContent :content="form.content" />
+          <div class="markdown-content" v-html="preview"></div>
         </div>
       </div>
 
@@ -49,7 +49,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { createPost, updatePost, fetchAllPosts } from '../api/posts'
-import MarkdownContent from '../components/MarkdownContent.vue'
+import { marked } from 'marked'
+
+marked.setOptions({ gfm: true, breaks: true })
 
 const route = useRoute()
 const router = useRouter()
@@ -67,12 +69,13 @@ const form = ref({
   published: false
 })
 
+const preview = computed(() => marked(form.value.content || ''))
+
 onMounted(async () => {
   if (!isEdit.value) return
 
   loading.value = true
   try {
-    // Fetch all posts and find by ID (the API returns id in the list)
     const posts = await fetchAllPosts()
     const post = posts.find(p => p.id === Number(route.params.id))
     if (!post) {

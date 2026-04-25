@@ -3,6 +3,7 @@ use "db"
 use "router"
 use "middleware"
 use "logger"
+use "markdown"
 use "./grains/migrate"
 use "./grains/posts"
 
@@ -22,6 +23,7 @@ let pg = db.postgres({
 log.info("Connected to PostgreSQL")
 log.info("Running migrations...")
 migrate.up(pg, "./migrations", log)
+log.info("Migrations complete")
 
 let app = router.create()
 
@@ -32,13 +34,18 @@ app.use(logger.middleware(log))
 
 // routes
 
+func renderPost(post) {
+    post.html = markdown.render(post.content)
+    return post
+}
+
 @app.get("/api/posts")
 func listPosts(req, params) {
     let showAll = false
     if (keys(req.query).contains("all") && req.query.all == "true") {
         showAll = true
     }
-    return http.json(posts.list(pg, showAll))
+    return http.json(posts.list(pg, showAll) |> map(renderPost))
 }
 
 @app.get("/api/posts/:slug")
@@ -47,7 +54,7 @@ func getPost(req, params) {
     if (!post) {
         return http.json({error: "Post not found"}, 404)
     }
-    return http.json(post)
+    return http.json(renderPost(post))
 }
 
 @app.post("/api/posts")
@@ -93,6 +100,11 @@ func deletePost(req, params) {
         log.error("Failed to delete post %{params.id}: %{err}")
         return http.json({error: str(err)}, 500)
     }
+}
+
+@app.get("/api/highlight.css")
+func getHighlightCSS(req, params) {
+    return {status: 200, body: markdown.highlightCSS, headers: {"Content-Type": "text/css"}}
 }
 
 // static serving

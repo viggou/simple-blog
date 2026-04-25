@@ -4,7 +4,7 @@ A blog with a [Praia](https://github.com/praia-lang/praia) REST API backend, Pos
 
 ## Requirements
 
-- [Praia](https://github.com/praia-lang/praia) >= 0.2.6
+- [Praia](https://github.com/praia-lang/praia) >= 0.3.1
 - [Docker](https://docs.docker.com/get-docker/) (for PostgreSQL, or bring your own)
 - [Node.js](https://nodejs.org/) >= 18 (for frontend development)
 
